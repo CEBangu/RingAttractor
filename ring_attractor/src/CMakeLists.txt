@@ -27,5 +27,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 add_executable(simuself para_sweep.cpp dyna.cpp dyna.hpp)
+# Link GSL and FFTW libraries
 target_link_libraries(simuself ${GSL_LIBRARIES} ${FFTW_LIBRARIES})
+target_link_libraries(simuself gsl gslcblas fftw3)
 # target_compile_features(simuself PRIVATE cxx_range_for)
