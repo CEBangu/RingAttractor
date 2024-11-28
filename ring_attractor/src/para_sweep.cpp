@@ -62,15 +62,15 @@ void simu(double* curstate, double* con, double* input, double* buf,
     /* init_connect_cosine(con, par); */
     init_connect(con, par);
 
-    /* FILE* fconnect = fopen("connectivity.dat", "w"); */
-    /* if (!fconnect) { */
-    /*     printf("cannot open file: connectivity.dat\n"); */
-    /*     exit(EXIT_FAILURE); */
-    /* } */
-    /* for (size_t i = 0; i < dim; ++i) { */
-    /*     fprintf(fconnect, "%f\n", con[i]); */
-    /* } */
-    /* fclose(fconnect); */
+    FILE* fconnect = fopen("connectivity.dat", "w");
+    if (!fconnect) {
+        printf("cannot open file: connectivity.dat\n");
+        exit(EXIT_FAILURE);
+    }
+    for (size_t i = 0; i < dim; ++i) {
+        fprintf(fconnect, "%f\n", con[i]);
+    }
+    fclose(fconnect);
 
     for (size_t i = 0; i < dim; ++i) {
         fft->in[i] = con[i];
@@ -83,6 +83,7 @@ void simu(double* curstate, double* con, double* input, double* buf,
     fft->connect = con;
 
     init_sw(curstate, input, buf, fft, par);
+    
     if (curstate[0] > 1e6) return;
     double max = 0;
     double min = 1e6;
@@ -90,16 +91,18 @@ void simu(double* curstate, double* con, double* input, double* buf,
         if (curstate[i] > max) max = curstate[i];
         if (curstate[i] < min) min = curstate[i];
     }
+    printf("curstate[0]: %f\n", curstate[0]); //gpt suggested
+    printf("min: %f, max: %f, diff: %f\n", min, max, fabs(min - max)); //gpt suggested
     if (fabs(min - max) < 1e-4) return;
-    /* FILE* finit = fopen("init.dat", "w"); */
-    /* if (!finit) { */
-    /*     printf("cannot open file: init.dat\n"); */
-    /*     exit(EXIT_FAILURE); */
-    /* } */
-    /* for (size_t i = 0; i < dim; ++i) { */
-    /*     fprintf(finit, "%f\n", curstate[i]); */
-    /* } */
-    /* fclose(finit); */
+    FILE* finit = fopen("init.dat", "w"); 
+    if (!finit) { 
+        printf("cannot open file: init.dat\n"); 
+        exit(EXIT_FAILURE); 
+    } 
+    for (size_t i = 0; i < dim; ++i) { 
+        fprintf(finit, "%f\n", curstate[i]); 
+    } 
+    fclose(finit); 
 
     /* uint16_t nbmax = check_1max(curstate, par); */
     /* if (nbmax > 1) return; */
@@ -173,10 +176,10 @@ int main(int argc, char *argv[])
 {
     gsl_rng_env_setup();
     rng = gsl_rng_alloc (gsl_rng_default);
-    /* struct timeval tv; */
-    /* gettimeofday(&tv, 0); */
-    /* unsigned long int seed = tv.tv_sec + tv.tv_usec; */
-    /* gsl_rng_set(rng, seed); */
+    struct timeval tv; 
+    gettimeofday(&tv, 0); 
+    unsigned long int seed = tv.tv_sec + tv.tv_usec; 
+    gsl_rng_set(rng, seed); 
     parasw_t par;
 
     uint16_t dim = 256;
