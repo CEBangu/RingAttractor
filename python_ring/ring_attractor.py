@@ -42,3 +42,18 @@ class LocalModel(RingAttractor):
                 kernel[neuron_index] = self.D
         return kernel
 
+
+class GlobalModel(RingAttractor):
+    def __init__(self, num_neurons, J0=-8, J1=6):
+        super().__init__(num_neurons=num_neurons)
+        self.J0 = J0
+        self.J1 = J1
+
+        self.kernel = self._connectivity_kernel()
+    
+    def _connectivity_kernel(self): #TODO
+        """This generates the connectivity for the global model"""
+        kernel = np.zeros(self.num_neurons) #same size as num_neurons
+        pass
+
+
