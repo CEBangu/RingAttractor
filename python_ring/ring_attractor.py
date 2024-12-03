@@ -8,11 +8,11 @@ class RingAttractor:
         self.T = T
 
         #initialize the neurons
-        self.theta = np.linspace(0, 2 * np.pi, N, endpoint=False)
+        self.theta = np.linspace(0, 2 * np.pi, num_neurons, endpoint=False)
         self.f = np.zeros(num_neurons) #initial activity profile
         self.mu_init = np.pi/2 #initial bump center, we'll say it's always at the front of the fly
 
-    def _von_mises(self, amplitude, kappa, theta, mu): #Their implementation of the function (Kim et al. 2017)
+    def von_mises(self, amplitude, kappa, theta, mu): #Their implementation of the function (Kim et al. 2017)
         if kappa > 5:
             return amplitude * np.exp(kappa * (np.cos(theta - mu) - 1))
         else:
@@ -22,7 +22,7 @@ class RingAttractor:
         """Initializes the activity profile via the von Mises function"""
         if center is None:
             center = self.mu_init
-        self.f = self._von_mises(self, amplitude, kappa, self.theta, center)
+        self.f = self.von_mises(self, amplitude, kappa, self.theta, center)
 
 
 class LocalModel(RingAttractor):
