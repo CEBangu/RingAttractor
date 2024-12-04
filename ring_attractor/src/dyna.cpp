@@ -138,20 +138,20 @@ void init_sw(double* curstate, double* input, double* buf,
 {
     for (size_t i = 0; i < 20.0 / par->dt; ++i) {
         dynamics_rk4step_fft(curstate, input, buf, fft, par);
-        if (i > 0) {
-            FILE* fstate = fopen("state.dat", "w");
-            if (fstate == NULL) {
-            fprintf(stderr, "Cannot open file %s: %s\n",
-                "state.dat", strerror(errno));
-            exit(EXIT_FAILURE);
-            }
-            for (size_t j = 0; j < par->nbpts; ++j) {
-            fprintf(fstate, "%f\n", curstate[j]);
-            }
-            fclose(fstate);
-            exit(EXIT_SUCCESS);
-        }
-        printf("%f\n", curstate[0]);
+        /* if (i > 0) { */
+        /*     FILE* fstate = fopen("state.dat", "w"); */
+        /*     if (fstate == NULL) { */
+        /*         fprintf(stderr, "Cannot open file %s: %s\n", */
+        /*                 "state.dat", strerror(errno)); */
+        /*         exit(EXIT_FAILURE); */
+        /*     } */
+        /*     for (size_t j = 0; j < par->nbpts; ++j) { */
+        /*         fprintf(fstate, "%f\n", curstate[j]); */
+        /*     } */
+        /*     fclose(fstate); */
+        /*     exit(EXIT_SUCCESS); */
+        /* } */
+        /* printf("%f\n", curstate[0]); */
     }
 }
 
