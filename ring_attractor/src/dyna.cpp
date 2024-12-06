@@ -364,7 +364,7 @@ size_t input_inner_loop(double amp, double width, double* input, size_t dim,
             break;
         }
     }
-    printf("%f %f %f %d %f\n", ampliini, ampliaft, width,
+    printf("%f %f %f %d %f\n", ampliini, ampliaft, width, //print line?
            check + checkjvf1, amp);
 
     return check + checkjvf1;
