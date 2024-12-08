@@ -186,7 +186,7 @@ int main(int argc, char *argv[])
     fft_t fft;
     fft.n = dim;
         
-    par.dt = 1.0e-3;
+    par.dt = 1.0e-3; //changed from e-3 to run faster
     par.trelax = 10.0;
     par.dx = 2 * M_PI / dim;
 
