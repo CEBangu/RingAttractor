@@ -102,7 +102,6 @@ void noisy_simu(double* curstate, double* input, double* buf,
 void end_trial(double* curstate, parasw_t* par);
 void jump_vs_flow(double* maxs);
 int16_t bump_width(double* curstate, parasw_t* par);
-void jump_vs_flow_input(double* curstate, double* input, double* buf,
-                        fft_t* fft, parasw_t* par, char** argv);
-
+void jump_vs_flow_input(double* curstate, double* input, double* buf, fft_t* fft,
+                        parasw_t* par, int argc, char** argv);
 #endif /* end of include guard: DYNA_HPP_1KJSUPBA */

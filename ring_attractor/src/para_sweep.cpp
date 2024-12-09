@@ -129,7 +129,7 @@ void simu(double* curstate, double* con, double* input, double* buf,
 }
 
 void input_diagram(double* curstate, double* con, double* input, double* buf,
-                   fft_t* fft, parasw_t* par, char** argv)
+                   fft_t* fft, parasw_t* par, int argc, char** argv)
 {
     uint16_t dim = par->nbpts;
     uint16_t dimc = par->nbpts / 2 + 1;
@@ -171,7 +171,7 @@ void input_diagram(double* curstate, double* con, double* input, double* buf,
     }
     fft->connect = con;
 
-    jump_vs_flow_input(curstate, input, buf, fft, par, argv);
+    jump_vs_flow_input(curstate, input, buf, fft, par, argc, argv);
 }
 
 int main(int argc, char *argv[])
@@ -217,7 +217,7 @@ int main(int argc, char *argv[])
     fft.fftcon = confft;
 
     /* input sweep */
-    input_diagram(curstate, con, input, buf, &fft, &par, argv);
+    input_diagram(curstate, con, input, buf, &fft, &par, argc, argv);
 
     fftw_destroy_plan(fftr);
     fftw_destroy_plan(fftinv);

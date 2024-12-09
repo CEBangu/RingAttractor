@@ -248,8 +248,7 @@ void noisy_simu(double* curstate, double* input, double* buf,
     }
     fclose(fprof);
 }
-void
-jump_vs_flow_simu(double inpos, double* curstate, double* input, double* buf,
+void jump_vs_flow_simu(double inpos, double* curstate, double* input, double* buf,
                   fft_t* fft, parasw_t* par)
 {
     uint16_t dim = par->nbpts;
@@ -371,29 +370,31 @@ size_t input_inner_loop(double amp, double width, double* input, size_t dim,
 }
 
 void jump_vs_flow_input(double* curstate, double* input, double* buf, fft_t* fft,
-                   parasw_t* par, char** argv)
+                        parasw_t* par, int argc, char** argv)
 {
     uint16_t dim = par->nbpts;
     uint16_t dimc = par->nbpts / 2 + 1;
-
-    /* initial state properties */
+    // Initial conditions
     for (size_t i = 0; i < dim; ++i) {
-        curstate[i] = 0;
-        input[i] = 0;
+        curstate[i] = 0.0;
+        input[i] = 0.0;
     }
     curstate[0] = 10.0;
     curstate[1] = 10.0;
     curstate[dim - 1] = 10.0;
     init_sw(curstate, input, buf, fft, par);
+
     double ampliini = curstate[0];
     if (curstate[0] > 1e6) return;
-    double max = 0;
-    double min = 1e6;
+
+    double max_val = 0.0;
+    double min_val = 1e6;
     for (size_t i = 0; i < dim; ++i) {
-        if (curstate[i] > max) max = curstate[i];
-        if (curstate[i] < min) min = curstate[i];
+        if (curstate[i] > max_val) max_val = curstate[i];
+        if (curstate[i] < min_val) min_val = curstate[i];
     }
-    if (fabs(min - max) < 1e-4) return;
+    if (fabs(min_val - max_val) < 1e-4) return;
+
     FILE* finit = fopen("init.dat", "w");
     if (!finit) {
         printf("cannot open file: init.dat\n");
@@ -405,25 +406,45 @@ void jump_vs_flow_input(double* curstate, double* input, double* buf, fft_t* fft
     fclose(finit);
 
     double bw = 2 * M_PI * bump_width(curstate, par) / par->nbpts;
-    /* printf("Bump width: %f\n", bw * 180 / M_PI); */
-    if (bw > M_PI / 4) return;
-    if (bw < 3 * M_PI / 16) return;
-    /* printf("width is good!\n"); */
+    if (bw > M_PI / 4 || bw < 3 * M_PI / 16) return;
 
     double* curstateini = static_cast<double*>(malloc(dim * sizeof(double)));
     for (size_t i = 0; i < dim; ++i) {
         curstateini[i] = curstate[i];
     }
 
-    // Check if we have 5 arguments total: argv[0], argv[1], argv[2], argv[3], argv[4]
-    // If yes, we run a single simulation with given angle, amp, and width.
-    if (argv[4] != NULL) {
-        // User provided: ./simuself connectivity_type input_angle amp width
-        double input_angle_deg = atof(argv[2]); // Originally was jump_dist, now interpreted as input angle
+    // Variables to hold damage parameters if needed
+    bool damage_mode = false;
+    double damage_degrees = 0.0;
+    int num_damaged = 0;
+
+    // Determine mode based on argc/argv
+    // 1. Parameter sweep (no damage): argc == 3
+    // 2. Parameter sweep (damage): argc == 6 && argv[3] == "--damage"
+    // 3. Single-run (no damage): argc == 5 && argv[3] != "--damage"
+    // 4. Single-run (damage): argc == 8 && argv[5] == "--damage"
+
+    if (argc == 3) {
+        // Parameter sweep (no damage)
+        // argv[1]: connectivity, argv[2]: angle
+        // No damage, proceed as original parameter sweep
+        // No changes needed here
+
+    } else if (argc == 6 && std::strcmp(argv[3], "--damage") == 0) {
+        // Parameter sweep with damage
+        // ./simuself delta angle --damage degrees num
+        damage_mode = true;
+        damage_degrees = atof(argv[4]);
+        num_damaged = atoi(argv[5]);
+
+    } else if (argc == 5 && std::strcmp(argv[3], "--damage") != 0) {
+        // Single-run no damage
+        // ./simuself delta angle amp width
+        double input_angle_deg = atof(argv[2]);
         double amp = atof(argv[3]);
         double width = atof(argv[4]);
 
-        // Initialize input based on parsed parameters
+        // Single-run logic without damage:
         double input_angle_rad = input_angle_deg * M_PI / 180.0;
         double kin = 1.0 / (width * width);
         for (size_t i = 0; i < dim; ++i) {
@@ -431,44 +452,43 @@ void jump_vs_flow_input(double* curstate, double* input, double* buf, fft_t* fft
             input[i] = par->offin + amp * vonmises(x, input_angle_rad, kin);
         }
 
-        // Reset curstate to initial conditions
         for (size_t i = 0; i < dim; ++i) {
             curstate[i] = curstateini[i];
         }
 
-        // Open a file to record neuron activities
+        // Open a file for neuron activities
         FILE* fneurons = fopen("single_run_activity.dat", "w");
         if (!fneurons) {
-            fprintf(stderr, "Cannot open file: single_run_activity.dat\n");
+            fprintf(stderr, "Cannot open single_run_activity.dat\n");
             free(curstateini);
             return;
         }
 
-        size_t max_steps = 10000; // Simulation duration
+        size_t max_steps = 10000;
+        bool regime_detected = false;
         double ampliaft = 0.0;
         int check_sum = 0;
 
         for (size_t step = 0; step < max_steps; ++step) {
-            // Record current neuron activities
+            // Record activities
             for (size_t i = 0; i < dim; ++i) {
                 fprintf(fneurons, "%f ", curstate[i]);
             }
             fprintf(fneurons, "\n");
 
-            // Perform one simulation step
             dynamics_rk4step_fft(curstate, input, buf, fft, par);
 
-            // Detect regime at each timestep
+            // Check regime
             uint16_t nbmax = check_1max(curstate, par);
-            if (nbmax > 1) {
-                max_t max_state_info = {0.0, 0};
+            if (nbmax > 1 && !regime_detected) {
+                // Determine regime
+                max_t max_state_info = {0.0,0};
                 for (uint16_t idx = 0; idx < dim; ++idx) {
                     if (curstate[idx] > max_state_info.max) {
                         max_state_info.max = curstate[idx];
                         max_state_info.pos = idx;
                     }
                 }
-
                 uint16_t max_pos = max_state_info.pos;
                 int checkjvf1 = 0;
                 if (max_pos > dim / 8 && max_pos < 7 * dim / 8) {
@@ -481,17 +501,120 @@ void jump_vs_flow_input(double* curstate, double* input, double* buf, fft_t* fft
 
                 ampliaft = curstate[0];
                 check_sum = checkjvf1;
-
-                // Print regime information to the console
-                printf("Step %lu: %f %f %f %d %f\n", step, ampliini, ampliaft, width, check_sum, amp);
+                printf("%f %f %f %d %f\n", ampliini, ampliaft, width, check_sum, amp);
+                regime_detected = true; // We don't stop, just note regime once
             }
         }
 
         fclose(fneurons);
         free(curstateini);
         return;
+
+    } else if (argc == 8 && std::strcmp(argv[5], "--damage") == 0) {
+        // Single-run with damage
+        // ./simuself delta angle amp width --damage degrees num
+        double input_angle_deg = atof(argv[2]);
+        double amp = atof(argv[3]);
+        double width = atof(argv[4]);
+        damage_mode = true;
+        damage_degrees = atof(argv[6]);
+        num_damaged = atoi(argv[7]);
+
+        // Setup input first
+        double input_angle_rad = input_angle_deg * M_PI / 180.0;
+        double kin = 1.0 / (width * width);
+        for (size_t i = 0; i < dim; ++i) {
+            double x = 2 * M_PI * i / dim;
+            input[i] = par->offin + amp * vonmises(x, input_angle_rad, kin);
+        }
+
+        // Reset curstate
+        for (size_t i = 0; i < dim; ++i) {
+            curstate[i] = curstateini[i];
+        }
+
+        // Apply damage
+        int dim_int = (int)dim;
+        int damage_index = (int)round((damage_degrees / 360.0) * dim_int);
+        int half = num_damaged / 2;
+        for (int k = damage_index - half; k <= damage_index + half; k++) {
+            int idx = (k + dim_int) % dim_int;
+            curstate[idx] = 0.0;
+        }
+
+        // Open a file for neuron activities
+        FILE* fneurons = fopen("single_run_activity.dat", "w");
+        if (!fneurons) {
+            fprintf(stderr, "Cannot open single_run_activity.dat\n");
+            free(curstateini);
+            return;
+        }
+
+        size_t max_steps = 10000;
+        bool regime_detected = false;
+        double ampliaft = 0.0;
+        int check_sum = 0;
+
+        for (size_t step = 0; step < max_steps; ++step) {
+            // Record activities
+            for (size_t i = 0; i < dim; ++i) {
+                fprintf(fneurons, "%f ", curstate[i]);
+            }
+            fprintf(fneurons, "\n");
+
+            dynamics_rk4step_fft(curstate, input, buf, fft, par);
+
+            // Check regime
+            uint16_t nbmax = check_1max(curstate, par);
+            if (nbmax > 1 && !regime_detected) {
+                // Determine regime
+                max_t max_state_info = {0.0,0};
+                for (uint16_t idx = 0; idx < dim; ++idx) {
+                    if (curstate[idx] > max_state_info.max) {
+                        max_state_info.max = curstate[idx];
+                        max_state_info.pos = idx;
+                    }
+                }
+                uint16_t max_pos = max_state_info.pos;
+                int checkjvf1 = 0;
+                if (max_pos > dim / 8 && max_pos < 7 * dim / 8) {
+                    if (max_pos > dim / 4 && max_pos < 3 * dim / 4) {
+                        checkjvf1 = 1; // Jump
+                    } else {
+                        checkjvf1 = 0; // Flow
+                    }
+                }
+
+                ampliaft = curstate[0];
+                check_sum = checkjvf1;
+                printf("%f %f %f %d %f\n", ampliini, ampliaft, width, check_sum, amp);
+                regime_detected = true; // Note regime once
+            }
+        }
+
+        fclose(fneurons);
+        free(curstateini);
+        return;
+
+    } else {
+        // If none of the above match, you can print an error or default behavior
+        fprintf(stderr, "Invalid arguments.\n");
+        free(curstateini);
+        return;
     }
 
+    // If we reach here, it's parameter sweep (maybe with damage).
+    if (damage_mode) {
+        int dim_int = (int)dim;
+        int damage_index = (int)round((damage_degrees / 360.0) * dim_int);
+        int half = num_damaged / 2;
+        for (int k = damage_index - half; k <= damage_index + half; k++) {
+            int idx = (k + dim_int) % dim_int;
+            curstate[idx] = 0.0;
+        }
+    }
+
+    // Parameter sweep logic as originally implemented
     size_t nb_width = 160;
     size_t nb_amp = 40;
     size_t nb_amp_fine = 10;
@@ -499,7 +622,6 @@ void jump_vs_flow_input(double* curstate, double* input, double* buf, fft_t* fft
     double sto_width = 3 * M_PI / 4;
     double sta_amp = 0.01;
     double sto_amp = 5.0 * 3;
-    /* double sto_amp = 0.2; */
     if (std::strcmp("delta", argv[1]) == 0) {
         sto_amp = 0.4 * 3;
     }
