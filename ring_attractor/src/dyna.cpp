@@ -370,8 +370,7 @@ size_t input_inner_loop(double amp, double width, double* input, size_t dim,
     return check + checkjvf1;
 }
 
-void
-jump_vs_flow_input(double* curstate, double* input, double* buf, fft_t* fft,
+void jump_vs_flow_input(double* curstate, double* input, double* buf, fft_t* fft,
                    parasw_t* par, char** argv)
 {
     uint16_t dim = par->nbpts;
@@ -414,6 +413,82 @@ jump_vs_flow_input(double* curstate, double* input, double* buf, fft_t* fft,
     double* curstateini = static_cast<double*>(malloc(dim * sizeof(double)));
     for (size_t i = 0; i < dim; ++i) {
         curstateini[i] = curstate[i];
+    }
+    // Check if we have 5 arguments total: argv[0], argv[1], argv[2], argv[3], argv[4]
+    // If yes, we run a single simulation with given angle, amp, and width.
+    if (argv[4] != NULL) {
+        // User provided: ./simuself connectivity_type input_angle amp width
+        double input_angle_deg = atof(argv[2]); // Originally was jump_dist, now interpreted as input angle
+        double amp = atof(argv[3]);
+        double width = atof(argv[4]);
+
+        // Initialize input based on parsed parameters
+        double input_angle_rad = input_angle_deg * M_PI / 180.0;
+        double kin = 1.0 / (width * width);
+        for (size_t i = 0; i < dim; ++i) {
+            double x = 2 * M_PI * i / dim;
+            input[i] = par->offin + amp * vonmises(x, input_angle_rad, kin);
+        }
+
+        // Reset curstate to initial conditions
+        for (size_t i = 0; i < dim; ++i) {
+            curstate[i] = curstateini[i];
+        }
+
+        // Open a file to record neuron activities
+        FILE* fneurons = fopen("single_run_activity.dat", "w");
+        if (!fneurons) {
+            fprintf(stderr, "Cannot open file: single_run_activity.dat\n");
+            free(curstateini);
+            return;
+        }
+
+        size_t max_steps = 10000; // Simulation duration
+        double ampliaft = 0.0;
+        int check_sum = 0;
+
+        for (size_t step = 0; step < max_steps; ++step) {
+            // Record current neuron activities
+            for (size_t i = 0; i < dim; ++i) {
+                fprintf(fneurons, "%f ", curstate[i]);
+            }
+            fprintf(fneurons, "\n");
+
+            // Perform one simulation step
+            dynamics_rk4step_fft(curstate, input, buf, fft, par);
+
+            // Detect regime at each timestep
+            uint16_t nbmax = check_1max(curstate, par);
+            if (nbmax > 1) {
+                max_t max_state_info = {0.0, 0};
+                for (uint16_t idx = 0; idx < dim; ++idx) {
+                    if (curstate[idx] > max_state_info.max) {
+                        max_state_info.max = curstate[idx];
+                        max_state_info.pos = idx;
+                    }
+                }
+
+                uint16_t max_pos = max_state_info.pos;
+                int checkjvf1 = 0;
+                if (max_pos > dim / 8 && max_pos < 7 * dim / 8) {
+                    if (max_pos > dim / 4 && max_pos < 3 * dim / 4) {
+                        checkjvf1 = 1; // Jump
+                    } else {
+                        checkjvf1 = 0; // Flow
+                    }
+                }
+
+                ampliaft = curstate[0];
+                check_sum = checkjvf1;
+
+                // Print regime information to the console
+                printf("Step %lu: %f %f %f %d %f\n", step, ampliini, ampliaft, width, check_sum, amp);
+            }
+        }
+
+        fclose(fneurons);
+        free(curstateini);
+        return;
     }
 
     size_t nb_width = 160;

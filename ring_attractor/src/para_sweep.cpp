@@ -38,8 +38,13 @@
 #include <gsl/gsl_randist.h>
 
 #include "dyna.hpp"
+#include <string>
 
 gsl_rng* rng;
+
+// Function prototype for running a single simulation
+void run_single_simulation(const std::string& connectivity_type, double input_angle_deg, 
+                           double amp, double width, parasw_t& par, fft_t& fft);
 
 void simu(double* curstate, double* con, double* input, double* buf,
           fft_t* fft, parasw_t* par);
