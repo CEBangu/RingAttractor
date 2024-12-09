@@ -414,6 +414,7 @@ void jump_vs_flow_input(double* curstate, double* input, double* buf, fft_t* fft
     for (size_t i = 0; i < dim; ++i) {
         curstateini[i] = curstate[i];
     }
+
     // Check if we have 5 arguments total: argv[0], argv[1], argv[2], argv[3], argv[4]
     // If yes, we run a single simulation with given angle, amp, and width.
     if (argv[4] != NULL) {
