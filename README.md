@@ -32,6 +32,7 @@ Both parameter sweeps output to the terminal, however they can be saved via a `>
 
 The version of this file contained in this branch has been jerry-rigged to run on my local machine. It will likely not work via a naive download. To return it to its original state, simply uncomment lines 35 and 36, and comment out lines 39-53 in ring_attractor/CMakeLists.txt. Also, comment out line 32 in ring_attractor/src/CMakeLists.txt
 
+**A word about bump_sampling**
 
 The folder `bump_sampling` contains the code the authors used to fit multiple bumps on the ring. This was outside the scope of this project, and thus remains unchanged.
 
