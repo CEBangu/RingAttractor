@@ -29,6 +29,9 @@
  * DAMAGE.
  */
 
+
+// This version contains edits to run single trials and ablation studies (single trials and sweeps) on the model - Ciprian Bangu 2024
+
 #include <cmath>
 #include <errno.h>
 #include <cstring>

@@ -29,6 +29,8 @@
  * DAMAGE.
  */
 
+// This version contains edits to run single trials and ablation studies (single trials and sweeps) on the model - Ciprian Bangu 2024
+
 #include <cmath>
 #include <vector>
 #include <cstring>
@@ -417,6 +419,8 @@ void jump_vs_flow_input(double* curstate, double* input, double* buf, fft_t* fft
     bool damage_mode = false;
     double damage_degrees = 0.0;
     int num_damaged = 0;
+    //setup vairable to store the ablated_indices
+    std::vector<int> ablated_indices;
 
     // Determine mode based on argc/argv
     // 1. Parameter sweep (no damage): argc == 3
@@ -520,6 +524,7 @@ void jump_vs_flow_input(double* curstate, double* input, double* buf, fft_t* fft
         damage_degrees = atof(argv[6]);
         num_damaged = atoi(argv[7]);
 
+
         // Setup input first
         double input_angle_rad = input_angle_deg * M_PI / 180.0;
         double kin = 1.0 / (width * width);
@@ -533,13 +538,20 @@ void jump_vs_flow_input(double* curstate, double* input, double* buf, fft_t* fft
             curstate[i] = curstateini[i];
         }
 
+        
         // Apply damage
         int dim_int = (int)dim;
         int damage_index = (int)round((damage_degrees / 360.0) * dim_int);
         int half = num_damaged / 2;
         for (int k = damage_index - half; k <= damage_index + half; k++) {
             int idx = (k + dim_int) % dim_int;
+            ablated_indices.push_back(idx);
             curstate[idx] = 0.0;
+        }
+
+        // remove recurrence from ablated neurons
+        for (int idx : ablated_indices){
+            fft->connect[idx] = 0.0;
         }
 
         // Open a file for neuron activities
@@ -556,13 +568,29 @@ void jump_vs_flow_input(double* curstate, double* input, double* buf, fft_t* fft
         int check_sum = 0;
 
         for (size_t step = 0; step < max_steps; ++step) {
+            //before step and record:
+            for (int idx : ablated_indices){
+                input[idx] = 0.0; //no external input
+            }
+            
             // Record activities
             for (size_t i = 0; i < dim; ++i) {
                 fprintf(fneurons, "%f ", curstate[i]);
             }
             fprintf(fneurons, "\n");
 
-            dynamics_rk4step_fft(curstate, input, buf, fft, par);
+            //zero them out again
+            for (int idx : ablated_indices){
+                curstate[idx] = 0.0;
+            }
+
+            dynamics_rk4step_fft(curstate, input, buf, fft, par, ablated_indices);
+            
+            // making sure that the damaged neuorns stay damaged
+            for (int idx : ablated_indices){
+                curstate[idx] = 0.0;
+                input[idx] = 0.0;
+            }
 
             // Check regime
             uint16_t nbmax = check_1max(curstate, par);
@@ -792,7 +820,7 @@ void input_sw(double* curstate, double* input, double* buf,
 }
 
 void dynamics_rk4step_fft(double* curstate, double* input, double* buffer,
-                          fft_t* fft, parasw_t* par)
+                          fft_t* fft, parasw_t* par, const std::vector<int>& ablated_indices) //updated to support ablation 
 {
     double dt = par->dt;
 
@@ -822,6 +850,12 @@ void dynamics_rk4step_fft(double* curstate, double* input, double* buffer,
         curstate[i] = buffer[i] + dt * (buffer[n + i] + 2.0 * buffer[3 * n + i]
                       + 2.0 * buffer[5 * n + i] + buffer[7 * n + i] ) / 6.0;
     }
+
+    // Enforce Ablation! 
+    for (int idx : ablated_indices){
+        curstate[idx] = 0.0;
+    }
+
 }
 
 void dynamics_noise_fft(double* curstate, double* input, double* buffer,

@@ -29,11 +29,14 @@
  * DAMAGE.
  */
 
+// This version contains edits to run single trials and ablation studies (single trials and sweeps) on the model - Ciprian Bangu 2024
+
 #ifndef DYNA_HPP_1KJSUPBA
 #define DYNA_HPP_1KJSUPBA
 
 #include "gsl/gsl_rng.h"
 #include <fftw3.h>
+#include <vector>
 
 extern const size_t nbpoints;
 
@@ -84,7 +87,7 @@ typedef struct {
 } fft_t;
 
 void dynamics_rk4step_fft(double* curstate, double* input, double* buffer,
-                          fft_t* fft, parasw_t* par);
+                          fft_t* fft, parasw_t* par, const std::vector<int>& ablated_indices = {}); //updated to support ablation
 void init_connect(double* connect, parasw_t* par);
 void init_connect_delta(double* connect, parasw_t* par);
 void init_connect_cosine(double* connect, parasw_t* par);
