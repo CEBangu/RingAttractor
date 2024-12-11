@@ -31,6 +31,10 @@ project(conti_attr)
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
 
+
+# find_package(GSL REQUIRED)
+# find_package(FFTW REQUIRED)
+
 # Paths for GSL and FFTW
 set(GSL_DIR /opt/homebrew/Cellar/gsl/2.8)
 include_directories(${GSL_DIR}/include)
