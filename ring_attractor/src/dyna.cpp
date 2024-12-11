@@ -415,14 +415,13 @@ void jump_vs_flow_input(double* curstate, double* input, double* buf, fft_t* fft
         curstateini[i] = curstate[i];
     }
 
-    // Variables to hold damage parameters if needed
+    // Variables to hold damage parameters
     bool damage_mode = false;
     double damage_degrees = 0.0;
     int num_damaged = 0;
     //setup vairable to store the ablated_indices
     std::vector<int> ablated_indices;
 
-    // Determine mode based on argc/argv
     // 1. Parameter sweep (no damage): argc == 3
     // 2. Parameter sweep (damage): argc == 6 && argv[3] == "--damage"
     // 3. Single-run (no damage): argc == 5 && argv[3] != "--damage"
@@ -506,7 +505,7 @@ void jump_vs_flow_input(double* curstate, double* input, double* buf, fft_t* fft
                 ampliaft = curstate[0];
                 check_sum = checkjvf1;
                 printf("%f %f %f %d %f\n", ampliini, ampliaft, width, check_sum, amp);
-                regime_detected = true; // We don't stop, just note regime once
+                regime_detected = true; // We don't stop, just note 
             }
         }
 
@@ -604,6 +603,7 @@ void jump_vs_flow_input(double* curstate, double* input, double* buf, fft_t* fft
                     }
                 }
                 uint16_t max_pos = max_state_info.pos;
+                //actually, I don't think regime checking works for a single trial in the damage runs.. (can't remember if it does for the non-damaged ones)
                 int checkjvf1 = 0;
                 if (max_pos > dim / 8 && max_pos < 7 * dim / 8) {
                     if (max_pos > dim / 4 && max_pos < 3 * dim / 4) {
@@ -642,7 +642,7 @@ void jump_vs_flow_input(double* curstate, double* input, double* buf, fft_t* fft
         }
     }
 
-    // Parameter sweep logic as originally implemented
+    // Parameter sweep as originally implemented
     size_t nb_width = 160;
     size_t nb_amp = 40;
     size_t nb_amp_fine = 10;
