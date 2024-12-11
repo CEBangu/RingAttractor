@@ -18,7 +18,7 @@ However, we add the following functionality:
 `./simuself {model} {input_angle} {amp} {width}`.
 
 2. The ability to run a single simulation trial with a range of neurons turned off. This is achieved by specifying amp, width, the --damaged flag, the degree offset from 0 of the center of the damaged neuron region, and the number of damaged neurons. i.e., 
-`./simuself {model} {input_angle} {amp} {widht} --damaged {center_offset_angle} {num_neurons}`.
+`./simuself {model} {input_angle} {amp} {width} --damaged {center_offset_angle} {num_neurons}`.
 
 3. The ability to run a parameter sweep with damaged neurons. This is achieved by setting the --damaged flag, the degree offset from 0 of the center of the damaged neurons, and the number of damaged neuron region. i.e.,
 `./simuself {model} {input_angle} --damaged {center_offset_angle} {num_neurons}`.
