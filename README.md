@@ -6,7 +6,7 @@ Authors: Sung Soo Kim\*, Hervé Rouault\*, Shaul Druckmann†, Vivek Jayaraman�
 † Correspondence to: druckmanns@janelia.hhmi.org or vivek@janelia.hhmi.org
 Science, 2017, doi: 10.1126/science.aal4835
 
-This repository was made to replicate and explore the model for COGSCI 318 - Theoretical Neuroscience at ENS. Specifcially, we perform an ablation study to generate model predictions of the impact of dead neurons in the network on bump activity. 
+This repository was made to replicate and explore the model for COGSCI 318 - Theoretical Neuroscience at ENS. Specifcially, we perform an ablation study to generate model predictions of the impact of dead neurons on bump activity in the network.
 
 This work is contained in the updated files in the folder `ring_attractor`. The updated files contain the author's code, as well as the necessary changes to conduct this study. 
 
