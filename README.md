@@ -28,9 +28,11 @@ Both parameter sweeps output to the terminal, however they can be saved via a `>
 
 `plotting.ipynb` contains the code to generate the plots used in our presentation. The videos of the activity one can generate are particularily fun. 
 
+To see the original code, checkout their repository, or the `original-code` branch of this repository.
+
 **A word about CMakeLists.txt**
 
-The version of this file contained in this branch has been jerry-rigged to run on my local machine. It will likely not work via a naive download. To return it to its original state, simply uncomment lines 35 and 36, and comment out lines 39-53 in ring_attractor/CMakeLists.txt. Also, comment out line 32 in ring_attractor/src/CMakeLists.txt
+The version of this file contained in this branch has been jerry-rigged to run on my local machine. It will likely not work via a naive download. To return it to its original state, simply uncomment lines 35 and 36, and comment out lines 39-53 in ring_attractor/CMakeLists.txt. Also, comment out line 32 in ring_attractor/src/CMakeLists.txt.
 
 **A word about bump_sampling**
 
