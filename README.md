@@ -10,7 +10,7 @@ This repository was made to replicate and explore the model for COGSCI 318 - The
 
 This work is contained in the updated files in the folder `ring_attractor`. The updated files contain the author's code, as well as the necessary changes to conduct this study. 
 
-As in the original code. to run the parameter sweep, specify the type of connectivity model, __delta__ or __cosine__, and the (integer) degree offset of the input stimulus with a cli command: `./simuself {model} {input_angle}`.
+As in the original code, to run the parameter sweep, specify the type of connectivity model, __delta__ or __cosine__, and the (integer) degree offset of the input stimulus with a cli command: `./simuself {model} {input_angle}`.
 
 However, we add the following functionality:
 
