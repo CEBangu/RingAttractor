@@ -29,8 +29,9 @@ However, we add the following functionality:
 5. The ability to run a parameter sweep with randomly damaged neurons. This is achieved by setting the --random_damage flag, and the number of damaged neurons i.e.,
 `./simuself {model} {input_angle} --random_damage {num_neurons}`.
 
-The single trial simulations produce a file called `single_run_activity.dat` which contains the activity of each neuron at each time step during a trial.
-Both parameter sweeps output to the terminal, however they can be saved via a `>` command, i.e., `./simuself {model} {input_angle} > filename.txt`
+The single trial simulations produce a file called `single_run_activity.dat` which contains the activity of each neuron at each time step during a trial. Single damaged runs will produce `single_run_damage_activity.dat`; single random damage runs will produce `single_run_random_damage_activity.dat`.
+
+All parameter sweeps output to the terminal, however they can be saved via a `>` command, i.e., `./simuself {model} {input_angle} > filename.txt`
 
 `plotting.ipynb` contains the code to generate the plots used in our presentation. The videos of the activity one can generate are particularily fun. 
 
