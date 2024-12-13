@@ -40,7 +40,7 @@
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_randist.h>
 
-#include "dyna.hpp"
+#include "dyna.hpp" //ablation
 #include <string>
 
 gsl_rng* rng;
@@ -177,8 +177,62 @@ void input_diagram(double* curstate, double* con, double* input, double* buf,
     jump_vs_flow_input(curstate, input, buf, fft, par, argc, argv);
 }
 
+void input_diagram_random(double* curstate, double* con, double* input, double* buf,
+                   fft_t* fft, parasw_t* par, int argc, char** argv)
+{
+    uint16_t dim = par->nbpts;
+    uint16_t dimc = par->nbpts / 2 + 1;
+
+    if (std::strcmp("delta", argv[1]) == 0) {
+        par->alpha = 3.0;
+        par->beta = 20.0;
+        par->D = 0.10;
+
+        init_connect_delta(con, par);
+    } else if (strcmp("cosine", argv[1]) == 0) {
+        par->J0 = -0.2;
+        par->J1 = 0.15;
+
+        init_connect_cosine(con, par);
+    } else {
+        printf("model not recognized\n");
+        exit(EXIT_FAILURE);
+    }
+
+    /* init_connect(con, par); */
+    FILE* fconnect = fopen("connect.dat", "w");
+    if (!fconnect) {
+        printf("cannot open file: connect.dat\n");
+        exit(EXIT_FAILURE);
+    }
+    for (size_t i = 0; i < dim; ++i) {
+        fprintf(fconnect, "%f\n", con[i]);
+    }
+    fclose(fconnect);
+
+    for (size_t i = 0; i < dim; ++i) {
+        fft->in[i] = con[i];
+    }
+    fftw_execute(fft->pland);
+    for (size_t i = 0; i < dimc; ++i) {
+        fft->fftcon[i][0] = fft->out[i][0];
+        fft->fftcon[i][1] = fft->out[i][1];
+    }
+    fft->connect = con;
+
+    jump_vs_flow_random_damage(curstate, input, buf, fft, par, argc, argv);
+}
+
 int main(int argc, char *argv[])
 {
+        // Check if random damage mode is triggered
+    bool random_damage_mode = false;
+    for (int i = 0; i < argc; i++) {
+        if (std::strcmp(argv[i], "--random_damage") == 0) {
+            random_damage_mode = true;
+            break;
+        }
+    }
     gsl_rng_env_setup();
     rng = gsl_rng_alloc (gsl_rng_default);
     /* struct timeval tv; */
@@ -219,9 +273,14 @@ int main(int argc, char *argv[])
 
     fft.fftcon = confft;
 
+    if (random_damage_mode == true) {
+        input_diagram_random(curstate, con, input, buf, &fft, &par, argc, argv);
+    
+    } else {
     /* input sweep */
-    input_diagram(curstate, con, input, buf, &fft, &par, argc, argv);
-
+        input_diagram(curstate, con, input, buf, &fft, &par, argc, argv);
+    }
+    
     fftw_destroy_plan(fftr);
     fftw_destroy_plan(fftinv);
     free(curstate);

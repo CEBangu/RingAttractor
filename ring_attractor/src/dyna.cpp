@@ -311,7 +311,7 @@ void jump_vs_flow_simu(double inpos, double* curstate, double* input, double* bu
 size_t input_inner_loop(double amp, double width, double* input, size_t dim,
                         double jump_dist, double* curstate,
                         double* curstateini, double* buf, double ampliini,
-                        fft_t* fft, parasw_t* par)
+                        fft_t* fft, parasw_t* par, const std::vector<int>& ablated_indices = {})
 {
     double kin = 1.0 / width / width;
 
@@ -355,7 +355,7 @@ size_t input_inner_loop(double amp, double width, double* input, size_t dim,
     uint16_t check = 0;
 
     for (size_t k = 0; k < 20.0 / par->dt; ++k) {
-        dynamics_rk4step_fft(curstate, input, buf, fft, par);
+        dynamics_rk4step_fft(curstate, input, buf, fft, par, ablated_indices);
         max_t max = max_state(curstate, dim);
         if (max.pos > dim / 16 && max.pos < 7 * dim / 8 ) {
             /* Checking for jumps */
@@ -554,7 +554,7 @@ void jump_vs_flow_input(double* curstate, double* input, double* buf, fft_t* fft
         }
 
         // Open a file for neuron activities
-        FILE* fneurons = fopen("single_run_activity.dat", "w");
+        FILE* fneurons = fopen("single_run_damage_activity.dat", "w");
         if (!fneurons) {
             fprintf(stderr, "Cannot open single_run_activity.dat\n");
             free(curstateini);
@@ -663,14 +663,14 @@ void jump_vs_flow_input(double* curstate, double* input, double* buf, fft_t* fft
             double amp = j * (sto_amp - sta_amp) / nb_amp + sta_amp;
             size_t outcur = input_inner_loop(amp, width, input, dim, jump_dist,
                                              curstate, curstateini, buf,
-                                             ampliini, fft, par); 
+                                             ampliini, fft, par, ablated_indices); 
             if (outcur != out) {
                 for (size_t k = 0; k < nb_amp_fine; ++k) {
                     amp = (j - 1 + double(k) / nb_amp_fine)
                            * (sto_amp - sta_amp) / nb_amp + sta_amp;
                     input_inner_loop(amp, width, input, dim, jump_dist,
                                      curstate, curstateini, buf, ampliini, fft,
-                                     par); 
+                                     par, ablated_indices); 
                 }
             }
             out = outcur;
@@ -679,6 +679,213 @@ void jump_vs_flow_input(double* curstate, double* input, double* buf, fft_t* fft
 
     free(curstateini);
 }
+
+void jump_vs_flow_random_damage(double* curstate, double* input, double* buf,
+                                fft_t* fft, parasw_t* par, int argc, char** argv)
+{
+    uint16_t dim = par->nbpts;
+    uint16_t dimc = par->nbpts / 2 + 1;
+
+    // Initialize current state and input
+    for (size_t i = 0; i < dim; ++i) {
+        curstate[i] = 0.0;
+        input[i] = 0.0;
+    }
+    curstate[0] = 10.0;
+    curstate[1] = 10.0;
+    curstate[dim - 1] = 10.0;
+    init_sw(curstate, input, buf, fft, par);
+
+    double ampliini = curstate[0];
+    if (curstate[0] > 1e6) return;
+
+    double max_val = 0.0;
+    double min_val = 1e6;
+    for (size_t i = 0; i < dim; ++i) {
+        if (curstate[i] > max_val) max_val = curstate[i];
+        if (curstate[i] < min_val) min_val = curstate[i];
+    }
+    if (fabs(min_val - max_val) < 1e-4) return;
+
+    // Create a copy of the initial state
+    double* curstateini_copy = static_cast<double*>(malloc(dim * sizeof(double)));
+    if (!curstateini_copy) {
+        fprintf(stderr, "Memory allocation failed.\n");
+        return;
+    }
+    for (size_t i = 0; i < dim; ++i) {
+        curstateini_copy[i] = curstate[i];
+    }
+
+    // check for --random_damage flag 
+    bool random_damage_mode = false;
+    int rd_index = -1; // Index where --random_damage appears
+    for (int i = 0; i < argc; ++i) {
+        if (strcmp(argv[i], "--random_damage") == 0) {
+            random_damage_mode = true;
+            rd_index = i;
+            break;
+        }
+    }
+
+    if (!random_damage_mode) {
+        fprintf(stderr, "Error: --random_damage flag not found.\n");
+        free(curstateini_copy);
+        return;
+    }
+
+    // Determine if it's single-run or parameter sweep based on argc and rd_index
+    bool single_run = false;
+    double input_angle_deg = 0.0;
+    double amp = 0.0;
+    double width = 0.0;
+    int num_damaged = 0;
+
+    if (rd_index == 5 && argc == 7) {
+        // Single-run: ./simuself delta 90 0.515750 2.341531 --random_damage 20
+        single_run = true;
+        input_angle_deg = atof(argv[2]);
+        amp = atof(argv[3]);
+        width = atof(argv[4]);
+        num_damaged = atoi(argv[6]);
+    }
+    else if (rd_index == 3 && argc == 5) {
+        // Parameter Sweep: ./simuself delta 90 --random_damage 20
+        single_run = false;
+        input_angle_deg = atof(argv[2]);
+        num_damaged = atoi(argv[4]);
+    }
+    else {
+        fprintf(stderr, "Error: Invalid arguments for --random_damage.\n");
+        fprintf(stderr, "Single-run usage: ./simuself <model> <angle_deg> <amp> <width> --random_damage <num_damaged>\n");
+        fprintf(stderr, "Parameter sweep usage: ./simuself <model> <angle_deg> --random_damage <num_damaged>\n");
+        free(curstateini_copy);
+        return;
+    }
+
+    // Validate num_damaged
+    if (num_damaged < 0) {
+        fprintf(stderr, "Error: Number of neurons to ablate cannot be negative.\n");
+        free(curstateini_copy);
+        return;
+    }
+
+    if (num_damaged == 0) {
+        fprintf(stdout, "No neurons to ablate. Skipping damage logic.\n");
+        free(curstateini_copy);
+        return;
+    }
+
+    // allowed range (i.e., can't be over initial bump)
+    std::vector<int> allowed;
+    for (int i = 29; i <= 227; i++) {
+        allowed.push_back(i);
+    }
+
+    if (static_cast<int>(allowed.size()) < num_damaged) {
+        fprintf(stderr, "Error: Requested too many damaged neurons (%d) compared to allowed range (%lu).\n",
+                num_damaged, allowed.size());
+        free(curstateini_copy);
+        return;
+    }
+
+    // Select random neurons to ablate
+    std::vector<int> ablated_indices;
+    gsl_rng* rng = gsl_rng_alloc(gsl_rng_default);
+    gsl_rng_set(rng, 1234); // Fixed seed for reproducibility
+
+    for (int d = 0; d < num_damaged; d++) {
+        size_t pick = gsl_rng_uniform_int(rng, allowed.size());
+        ablated_indices.push_back(allowed[pick]);
+        allowed.erase(allowed.begin() + pick);
+    }
+    gsl_rng_free(rng);
+
+    if (single_run) {
+        // Single-run logic
+        double input_angle_rad = input_angle_deg * M_PI / 180.0;
+        double kin = 1.0 / (width * width);
+        for (size_t i = 0; i < dim; ++i) {
+            double x = 2 * M_PI * i / dim;
+            input[i] = par->offin + amp * vonmises(x, input_angle_rad, kin);
+        }
+        for (size_t i = 0; i < dim; ++i) {
+            curstate[i] = curstateini_copy[i];
+        }
+
+        // Apply ablation
+        for (int idx : ablated_indices) {
+            curstate[idx] = 0.0;
+        }
+
+        // Open file for recording activities
+        FILE* fneurons = fopen("single_run_random_damage_activity.dat", "w");
+        if (!fneurons) {
+            fprintf(stderr, "Error: Cannot open single_run_random_damage_activity.dat for writing.\n");
+            free(curstateini_copy);
+            return;
+        }
+
+        size_t max_steps = 10000;
+        for (size_t step = 0; step < max_steps; ++step) {
+            // Reapply ablation at each step
+            for (int idx : ablated_indices) {
+                curstate[idx] = 0.0;
+            }
+
+            // Record current state
+            for (size_t i = 0; i < dim; ++i) {
+                fprintf(fneurons, "%f ", curstate[i]);
+            }
+            fprintf(fneurons, "\n");
+
+            // Perform dynamics step
+            dynamics_rk4step_fft(curstate, input, buf, fft, par, ablated_indices);
+        }
+
+        fclose(fneurons);
+        free(curstateini_copy);
+        return;
+    }
+    else {
+        // Parameter sweep logic
+        double jump_dist = input_angle_deg; 
+        size_t nb_width = 160;
+        size_t nb_amp = 40;
+        size_t nb_amp_fine = 10;
+        double sta_width = 0.01;
+        double sto_width = 3 * M_PI / 4;
+        double sta_amp = 0.01;
+        double sto_amp = 5.0 * 3;
+
+        // Adjust sto_amp if model is "delta"
+        if (strcmp(argv[1], "delta") == 0) {
+            sto_amp = 0.4 * 3;
+        }
+
+        for (size_t i = 0; i < nb_width; ++i) {
+            double width = i * (sto_width - sta_width) / nb_width + sta_width;
+            for (size_t j = 0; j < nb_amp; ++j) {
+                double amp = j * (sto_amp - sta_amp) / nb_amp + sta_amp;
+                size_t outcur = input_inner_loop(amp, width, input, dim, jump_dist,
+                                                 curstate, curstateini_copy, buf,
+                                                 ampliini, fft, par, ablated_indices); 
+                if (outcur != 0) { // Adjusted condition to detect changes
+                    for (size_t k = 0; k < nb_amp_fine; ++k) {
+                        double fine_amp = (j - 1 + static_cast<double>(k) / nb_amp_fine) *
+                                          (sto_amp - sta_amp) / nb_amp + sta_amp;
+                        input_inner_loop(fine_amp, width, input, dim, jump_dist,
+                                         curstate, curstateini_copy, buf,
+                                         ampliini, fft, par, ablated_indices);
+                    }
+                }
+            }
+        }
+
+        free(curstateini_copy);
+    }
+}
+
 
 void input_sw(double* curstate, double* input, double* buf,
               fft_t* fft, parasw_t* par)

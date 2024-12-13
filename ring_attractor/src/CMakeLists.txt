@@ -26,7 +26,7 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-add_executable(simuself para_sweep.cpp dyna.cpp dyna.hpp)
+add_executable(simuself para_sweep.cpp dyna.cpp dyna.hpp) #modified again for the random behavior
 # Link GSL and FFTW libraries
 target_link_libraries(simuself ${GSL_LIBRARIES} ${FFTW_LIBRARIES})
 target_link_libraries(simuself gsl gslcblas fftw3)
