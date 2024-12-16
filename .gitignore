@@ -1,3 +1,5 @@
 build
 /.vscode
 .DS_Store
+/results
+ring_attractor/plots_n_vids/
