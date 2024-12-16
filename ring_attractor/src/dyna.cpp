@@ -717,7 +717,7 @@ void jump_vs_flow_random_damage(double* curstate, double* input, double* buf,
         curstateini_copy[i] = curstate[i];
     }
 
-    // check for --random_damage flag 
+    // Detect if --random_damage flag is present
     bool random_damage_mode = false;
     int rd_index = -1; // Index where --random_damage appears
     for (int i = 0; i < argc; ++i) {
@@ -776,7 +776,7 @@ void jump_vs_flow_random_damage(double* curstate, double* input, double* buf,
         return;
     }
 
-    // allowed range (i.e., can't be over initial bump)
+    // Define allowed range (based on your original logic)
     std::vector<int> allowed;
     for (int i = 29; i <= 227; i++) {
         allowed.push_back(i);
@@ -849,7 +849,6 @@ void jump_vs_flow_random_damage(double* curstate, double* input, double* buf,
     }
     else {
         // Parameter sweep logic
-        double jump_dist = input_angle_deg; 
         size_t nb_width = 160;
         size_t nb_amp = 40;
         size_t nb_amp_fine = 10;
@@ -863,22 +862,26 @@ void jump_vs_flow_random_damage(double* curstate, double* input, double* buf,
             sto_amp = 0.4 * 3;
         }
 
+        double jump_dist = atof(argv[2]);
+
         for (size_t i = 0; i < nb_width; ++i) {
+            size_t out = 0;
             double width = i * (sto_width - sta_width) / nb_width + sta_width;
             for (size_t j = 0; j < nb_amp; ++j) {
                 double amp = j * (sto_amp - sta_amp) / nb_amp + sta_amp;
                 size_t outcur = input_inner_loop(amp, width, input, dim, jump_dist,
                                                  curstate, curstateini_copy, buf,
                                                  ampliini, fft, par, ablated_indices); 
-                if (outcur != 0) { // Adjusted condition to detect changes
+                if (outcur != out) { // Adjusted condition to detect changes
                     for (size_t k = 0; k < nb_amp_fine; ++k) {
-                        double fine_amp = (j - 1 + static_cast<double>(k) / nb_amp_fine) *
+                        amp = (j - 1 + double(k) / nb_amp_fine) *
                                           (sto_amp - sta_amp) / nb_amp + sta_amp;
-                        input_inner_loop(fine_amp, width, input, dim, jump_dist,
+                        input_inner_loop(amp, width, input, dim, jump_dist,
                                          curstate, curstateini_copy, buf,
                                          ampliini, fft, par, ablated_indices);
                     }
                 }
+                out = outcur;
             }
         }
 
