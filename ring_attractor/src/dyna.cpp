@@ -467,7 +467,14 @@ void jump_vs_flow_input(double* curstate, double* input, double* buf, fft_t* fft
             return;
         }
 
-        size_t max_steps = 10000;
+        size_t max_steps;
+        if (atof(argv[2]) < 120) {
+            max_steps = 10000;
+        } else if (atof(argv[2]) < 150) {
+            max_steps = 43593;
+        } else {
+            max_steps = 63620;
+        }
         bool regime_detected = false;
         double ampliaft = 0.0;
         int check_sum = 0;
@@ -513,9 +520,8 @@ void jump_vs_flow_input(double* curstate, double* input, double* buf, fft_t* fft
         free(curstateini);
         return;
 
-    } else if (argc == 8 && std::strcmp(argv[5], "--damage") == 0) {
+    }else if (argc == 8 && std::strcmp(argv[5], "--damage") == 0) {
         // Single-run with damage
-        // ./simuself delta angle amp width --damage degrees num
         double input_angle_deg = atof(argv[2]);
         double amp = atof(argv[3]);
         double width = atof(argv[4]);
@@ -523,22 +529,6 @@ void jump_vs_flow_input(double* curstate, double* input, double* buf, fft_t* fft
         damage_degrees = atof(argv[6]);
         num_damaged = atoi(argv[7]);
 
-
-        // Setup input first
-        double input_angle_rad = input_angle_deg * M_PI / 180.0;
-        double kin = 1.0 / (width * width);
-        for (size_t i = 0; i < dim; ++i) {
-            double x = 2 * M_PI * i / dim;
-            input[i] = par->offin + amp * vonmises(x, input_angle_rad, kin);
-        }
-
-        // Reset curstate
-        for (size_t i = 0; i < dim; ++i) {
-            curstate[i] = curstateini[i];
-        }
-
-        
-        // Apply damage
         int dim_int = (int)dim;
         int damage_index = (int)round((damage_degrees / 360.0) * dim_int);
         int half = num_damaged / 2;
@@ -553,7 +543,38 @@ void jump_vs_flow_input(double* curstate, double* input, double* buf, fft_t* fft
             fft->connect[idx] = 0.0;
         }
 
-        // Open a file for neuron activities
+        // **NEW CODE: Recompute fft->fftcon after modifying fft->connect** //THIS IS THE MAIN ALTERATION
+        for (size_t i = 0; i < par->nbpts; ++i) {
+            fft->in[i] = fft->connect[i];
+        }
+        fftw_execute(fft->pland); // perform forward FFT on updated connectivity
+        for (size_t i = 0; i < par->nbpts / 2 + 1; ++i) {
+            fft->fftcon[i][0] = fft->out[i][0];
+            fft->fftcon[i][1] = fft->out[i][1];
+        }
+
+        // Set up input after damage
+        double input_angle_rad = input_angle_deg * M_PI / 180.0;
+        double kin = 1.0 / (width * width);
+        for (size_t i = 0; i < dim; ++i) {
+            double x = 2 * M_PI * i / dim;
+            input[i] = par->offin + amp * vonmises(x, input_angle_rad, kin);
+        }
+        for (int idx : ablated_indices) {
+            input[idx] = 0.0;
+        }
+
+        // Reset the state to initial conditions after damage
+        for (size_t i = 0; i < dim; ++i) {
+            curstate[i] = curstateini[i];
+        }
+
+        // A second pass to ensure damaged neurons remain at zero
+        for (int idx : ablated_indices){
+            curstate[idx] = 0.0;
+        }
+
+        // Run the simulation as before
         FILE* fneurons = fopen("single_run_damage_activity.dat", "w");
         if (!fneurons) {
             fprintf(stderr, "Cannot open single_run_activity.dat\n");
@@ -561,29 +582,33 @@ void jump_vs_flow_input(double* curstate, double* input, double* buf, fft_t* fft
             return;
         }
 
-        size_t max_steps = 10000;
+        size_t max_steps;
+        if (atof(argv[2]) < 120) {
+            max_steps = 10000;
+        } else if (atof(argv[2]) < 150) {
+            max_steps = 43593;
+        } else {
+            max_steps = 63620;
+        }
+
         bool regime_detected = false;
         double ampliaft = 0.0;
         int check_sum = 0;
 
         for (size_t step = 0; step < max_steps; ++step) {
-            //before step and record:
-            for (int idx : ablated_indices){
-                input[idx] = 0.0; //no external input
+            for (int idx : ablated_indices) {
+                input[idx] = 0.0;  // no external input to damaged neurons
+                curstate[idx] = 0.0; // ensure they stay zero
             }
-            
-            // Record activities
+
+            // Record current state
             for (size_t i = 0; i < dim; ++i) {
                 fprintf(fneurons, "%f ", curstate[i]);
             }
             fprintf(fneurons, "\n");
 
-            //zero them out again
-            for (int idx : ablated_indices){
-                curstate[idx] = 0.0;
-            }
-
             dynamics_rk4step_fft(curstate, input, buf, fft, par, ablated_indices);
+
             
             // making sure that the damaged neuorns stay damaged
             for (int idx : ablated_indices){
@@ -638,6 +663,7 @@ void jump_vs_flow_input(double* curstate, double* input, double* buf, fft_t* fft
         int half = num_damaged / 2;
         for (int k = damage_index - half; k <= damage_index + half; k++) {
             int idx = (k + dim_int) % dim_int;
+            ablated_indices.push_back(idx); //was this the problem?
             curstate[idx] = 0.0;
         }
     }
@@ -719,7 +745,7 @@ void jump_vs_flow_random_damage(double* curstate, double* input, double* buf,
 
     // Detect if --random_damage flag is present
     bool random_damage_mode = false;
-    int rd_index = -1; // Index where --random_damage appears
+    int rd_index = -1; 
     for (int i = 0; i < argc; ++i) {
         if (strcmp(argv[i], "--random_damage") == 0) {
             random_damage_mode = true;
@@ -734,15 +760,16 @@ void jump_vs_flow_random_damage(double* curstate, double* input, double* buf,
         return;
     }
 
-    // Determine if it's single-run or parameter sweep based on argc and rd_index
     bool single_run = false;
     double input_angle_deg = 0.0;
     double amp = 0.0;
     double width = 0.0;
     int num_damaged = 0;
 
+    // Determine single-run or parameter sweep usage
     if (rd_index == 5 && argc == 7) {
-        // Single-run: ./simuself delta 90 0.515750 2.341531 --random_damage 20
+        // Single-run
+        // ./simuself delta 90 0.515750 2.341531 --random_damage 20
         single_run = true;
         input_angle_deg = atof(argv[2]);
         amp = atof(argv[3]);
@@ -750,20 +777,18 @@ void jump_vs_flow_random_damage(double* curstate, double* input, double* buf,
         num_damaged = atoi(argv[6]);
     }
     else if (rd_index == 3 && argc == 5) {
-        // Parameter Sweep: ./simuself delta 90 --random_damage 20
+        // Parameter sweep
+        // ./simuself delta 90 --random_damage 20
         single_run = false;
         input_angle_deg = atof(argv[2]);
         num_damaged = atoi(argv[4]);
     }
     else {
         fprintf(stderr, "Error: Invalid arguments for --random_damage.\n");
-        fprintf(stderr, "Single-run usage: ./simuself <model> <angle_deg> <amp> <width> --random_damage <num_damaged>\n");
-        fprintf(stderr, "Parameter sweep usage: ./simuself <model> <angle_deg> --random_damage <num_damaged>\n");
         free(curstateini_copy);
         return;
     }
 
-    // Validate num_damaged
     if (num_damaged < 0) {
         fprintf(stderr, "Error: Number of neurons to ablate cannot be negative.\n");
         free(curstateini_copy);
@@ -776,13 +801,13 @@ void jump_vs_flow_random_damage(double* curstate, double* input, double* buf,
         return;
     }
 
-    // Define allowed range (based on your original logic)
+    // Allowed range of neurons for damage
     std::vector<int> allowed;
     for (int i = 29; i <= 227; i++) {
         allowed.push_back(i);
     }
 
-    if (static_cast<int>(allowed.size()) < num_damaged) {
+    if ((int)allowed.size() < num_damaged) {
         fprintf(stderr, "Error: Requested too many damaged neurons (%d) compared to allowed range (%lu).\n",
                 num_damaged, allowed.size());
         free(curstateini_copy);
@@ -801,6 +826,21 @@ void jump_vs_flow_random_damage(double* curstate, double* input, double* buf,
     }
     gsl_rng_free(rng);
 
+    // Apply ablation to connectivity
+    for (int idx : ablated_indices) {
+        fft->connect[idx] = 0.0;
+    }
+
+    // **NEW CODE: Recompute fft->fftcon after modifying fft->connect**
+    for (size_t i = 0; i < par->nbpts; ++i) {
+        fft->in[i] = fft->connect[i];
+    }
+    fftw_execute(fft->pland); // Forward FFT on updated connectivity
+    for (size_t i = 0; i < par->nbpts / 2 + 1; ++i) {
+        fft->fftcon[i][0] = fft->out[i][0];
+        fft->fftcon[i][1] = fft->out[i][1];
+    }
+
     if (single_run) {
         // Single-run logic
         double input_angle_rad = input_angle_deg * M_PI / 180.0;
@@ -813,24 +853,33 @@ void jump_vs_flow_random_damage(double* curstate, double* input, double* buf,
             curstate[i] = curstateini_copy[i];
         }
 
-        // Apply ablation
+        // Ensure ablated neurons remain at zero
         for (int idx : ablated_indices) {
             curstate[idx] = 0.0;
+            input[idx] = 0.0;
         }
 
-        // Open file for recording activities
         FILE* fneurons = fopen("single_run_random_damage_activity.dat", "w");
         if (!fneurons) {
-            fprintf(stderr, "Error: Cannot open single_run_random_damage_activity.dat for writing.\n");
+            fprintf(stderr, "Error: Cannot open single_run_random_damage_activity.dat.\n");
             free(curstateini_copy);
             return;
         }
 
-        size_t max_steps = 10000;
+        size_t max_steps;
+        if (input_angle_deg < 120) {
+            max_steps = 10000;
+        } else if (input_angle_deg < 150) {
+            max_steps = 43593;
+        } else {
+            max_steps = 63620;
+        }
+
         for (size_t step = 0; step < max_steps; ++step) {
-            // Reapply ablation at each step
+            // Enforce ablation at each step
             for (int idx : ablated_indices) {
                 curstate[idx] = 0.0;
+                input[idx] = 0.0;
             }
 
             // Record current state
@@ -839,15 +888,13 @@ void jump_vs_flow_random_damage(double* curstate, double* input, double* buf,
             }
             fprintf(fneurons, "\n");
 
-            // Perform dynamics step
             dynamics_rk4step_fft(curstate, input, buf, fft, par, ablated_indices);
         }
 
         fclose(fneurons);
         free(curstateini_copy);
         return;
-    }
-    else {
+    } else {
         // Parameter sweep logic
         size_t nb_width = 160;
         size_t nb_amp = 40;
@@ -857,7 +904,6 @@ void jump_vs_flow_random_damage(double* curstate, double* input, double* buf,
         double sta_amp = 0.01;
         double sto_amp = 5.0 * 3;
 
-        // Adjust sto_amp if model is "delta"
         if (strcmp(argv[1], "delta") == 0) {
             sto_amp = 0.4 * 3;
         }
@@ -872,10 +918,9 @@ void jump_vs_flow_random_damage(double* curstate, double* input, double* buf,
                 size_t outcur = input_inner_loop(amp, width, input, dim, jump_dist,
                                                  curstate, curstateini_copy, buf,
                                                  ampliini, fft, par, ablated_indices); 
-                if (outcur != out) { // Adjusted condition to detect changes
+                if (outcur != out) {
                     for (size_t k = 0; k < nb_amp_fine; ++k) {
-                        amp = (j - 1 + double(k) / nb_amp_fine) *
-                                          (sto_amp - sta_amp) / nb_amp + sta_amp;
+                        amp = (j - 1 + double(k) / nb_amp_fine) * (sto_amp - sta_amp) / nb_amp + sta_amp;
                         input_inner_loop(amp, width, input, dim, jump_dist,
                                          curstate, curstateini_copy, buf,
                                          ampliini, fft, par, ablated_indices);
@@ -1035,10 +1080,17 @@ void dynamics_rk4step_fft(double* curstate, double* input, double* buffer,
     double dt = par->dt;
 
     uint16_t n = par->nbpts;
+    // for (int idx : ablated_indices){
+    //     curstate[idx] = 0.0;
+    // }
 
     for (size_t i = 0; i < n; i++ ) {
         buffer[i] = curstate[i];
     }
+        // Enforce Ablation! 
+    // for (int idx : ablated_indices){
+    //     curstate[idx] = 0.0;
+    // }
     deriv_fft(&buffer[0], &buffer[n], input, par, fft);
 
     for (size_t i = 0; i < n; i++ ) {
